@@ -1,0 +1,193 @@
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.*;
+import java.util.ArrayList;
+import java.util.Scanner;
+public class Chat {
+    public static boolean waitingForInput;
+    public static ArrayList<Socket> connections = new ArrayList<>();
+
+    /**
+     * Checks for a port number in the args parameter which is defined when running the program.
+     * This method also starts the server thread to listen for incomming connections.
+     * This method also listens for user input from the user.
+     * @param args contains the port number that will be used by the server
+     */
+    public static void main(String[] args) {
+        if(args.length != 1) {
+            System.out.println("Start program with the port argument\nEx: java Chat 6565\n");
+            System.exit(1);
+        }
+        int port = Integer.parseInt(args[0]);
+        Scanner input = new Scanner(System.in);
+        new Server(port).start();
+
+        while(true) {
+            waitingForInput = true;
+            System.out.print(">> ");
+            String userInput = input.nextLine();
+            waitingForInput = false;
+            String[] userInputs = userInput.split(" ");
+            switch(userInputs[0]) {
+                case "help":
+                    // add call to help function
+                    break;
+                case "myip":
+                    // add call to myip function
+                    break;
+                case "myport":
+                    System.out.println("Port: " + Server.getMyPort());
+                    break;
+                case "connect":
+                    if(userInputs.length == 3) {
+                        connect(userInputs[1], Integer.parseInt(userInputs[2]));
+                    }
+                    else {
+                        System.out.println("Wrong usage\nEX: connect 192.168.1.1 6565");
+                    }
+                    break;
+                case "terminate":
+                    // Call terminate function here
+                    break;
+                case "send":
+                    // Call send function here
+                    break;
+                case "list":
+                    // Call List connections function here
+                    break;
+                case "exit":
+                    // Call close all connections function here
+                    System.exit(0);
+                default:
+                    System.out.println('"'+userInputs[0]+'"' + " is not a command. Type help for a list of commands.");
+            }
+        }
+    }
+
+    /**
+     * Attempts to establish a tcp connection with the hostname and port.
+     * It also starts a clientThread which will listen for messages from this connection.
+     * @param hostname hostname of the computer you are trying to connect to
+     * @param port port of the process you are trying to connect to
+     * @see SocketThread Has the code that listens for a message from this connection.
+     */
+    public static void connect(String hostname, int port) {
+        Socket socket = null;
+        try{
+            socket = new Socket(hostname, port);
+            Chat.connections.add(socket);
+            System.out.println("Successfully connected to " + socket.getRemoteSocketAddress().toString());
+            new SocketThread(socket).start();
+        } catch ( UnknownHostException ex) {
+            System.out.println("Server not found: " + ex.getMessage());
+        } catch (IOException ex) {
+            System.out.println("I/0 Error: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Prints a string from a thread that is not the main thread. The purpose
+     * of this method is to ensure that the line in the console that
+     * signifies the program is listening for user input isn't overwritten.
+     * Prevents the following string from being overwritten in the console
+     * ">> "
+     *
+     * Use this if you are printing from a thread that is not the main thread.
+     * @param s The string that will be printed
+     */
+    public static void printFromThread(String s) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(s);
+        sb.append((Chat.waitingForInput) ? "\n>> ":"");
+        sb.insert(0,(Chat.waitingForInput) ? '\r':"");
+        System.out.print((Chat.waitingForInput) ? sb : sb.toString() + '\n');
+    }
+}
+
+class Server extends Thread {
+    private static int port;
+    private static ServerSocket serverSocket;
+
+    /**
+     * This constructor creates a serverSocket with the specified port number.
+     * @param port The port that will be used in the Server socket.
+     */
+    public Server(int port) {
+        this.port = port;
+        try {
+            this.serverSocket = new ServerSocket(this.port);
+            System.out.println("Server is listening on port " + this.port);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Continuously listens for new connections and accepts them.
+     * This socket will be added to the list of connections and a new
+     * SocketThread is created to listen for a message from this connection.
+     * The start function will run this method on a new thread.
+     * @See SocketThread Has the code that listens for a message from this connection.
+     */
+    public void run() {
+        try {
+            while(true) {
+                Socket socket = serverSocket.accept();
+                Chat.printFromThread("New connection with "+socket.getRemoteSocketAddress());
+                Chat.connections.add(socket);
+                new SocketThread(socket).start();
+            }
+        } catch(IOException ex) {
+            Chat.printFromThread("Server exception: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    /**
+     *
+     * @return Returns the port that the server is running on.
+     */
+    public static int getMyPort() {
+        return port;
+    }
+}
+
+class SocketThread extends Thread {
+    private Socket socket;
+
+    public SocketThread(Socket socket) {
+        this.socket = socket;
+    }
+
+    /**
+     * Creates a buffered reader from the sockets input stream
+     * which will be used to listen for messages that arrive from this connection.
+     * if the message is null then the connection has been closed. This method will
+     * also print the message when it is received.
+     */
+    public void run() {
+        try {
+            InputStream input = socket.getInputStream();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+
+            String text;
+            do {
+                text = reader.readLine();
+                if(text == null) {
+                    break;
+                }
+                Chat.printFromThread(socket.getRemoteSocketAddress() + " sent a message\nMessage: "+ text);
+            } while(true);
+
+            Chat.printFromThread("The connection with "+ socket.getRemoteSocketAddress().toString() + " was terminated.");
+            socket.close();
+        } catch(SocketException ex) {
+            Chat.printFromThread("Lost connection with " + socket.getRemoteSocketAddress());
+        } catch (IOException ex) {
+            Chat.printFromThread("Server exception: " + ex.getMessage());
+        }
+    }
+}
