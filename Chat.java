@@ -32,10 +32,10 @@ public class Chat {
             String[] userInputs = userInput.split(" ");
             switch(userInputs[0]) {
                 case "help":
-                    // add call to help function
+                    displayHelp();
                     break;
                 case "myip":
-                    // add call to myip function
+                    displayIPAddress();
                     break;
                 case "myport":
                     System.out.println("Port: " + Server.getMyPort());
@@ -49,20 +49,124 @@ public class Chat {
                     }
                     break;
                 case "terminate":
-                    // Call terminate function here
+                    terminateConnection(Integer.parseInt(userInputs[1]));
                     break;
                 case "send":
                     // Call send function here
                     break;
                 case "list":
-                    // Call List connections function here
+                    listConnections();
                     break;
                 case "exit":
-                    // Call close all connections function here
+                    closeAllConnections();
                     System.exit(0);
                 default:
                     System.out.println('"'+userInputs[0]+'"' + " is not a command. Type help for a list of commands.");
             }
+        }
+    }
+
+    private static void displayHelp() {
+        System.out.println("Available Commands:");
+        System.out.println("help  - Display this help menu.");
+        System.out.println("myip  - Display the IP address of this process.");
+        System.out.println("myport  - Display the port on which this process is listening for incoming connections.");
+        System.out.println("connect  - Establishes a new TCP connection to the specified <destination> at the specified < port no.>");
+        System.out.println("terminate  - Will terminate the connection listed under the specified number when LIST is used to display all connections");
+        System.out.println("send  - Send the message to the host on the connection that is designated");
+        System.out.println("list  - Display a numbered list of all the connections this process is part of");
+        System.out.println("exit  - Close all connections and terminate this process.");
+    }
+
+    /**
+     * Displays the ip address of the computer running this process. It does this
+     * by connecting to google.com and getting the local address.
+     */
+    private static void displayIPAddress() {
+        try {
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress("google.com", 80));
+            System.out.println(socket.getLocalAddress().toString().substring(1));
+            socket.close();
+        } catch (SocketException e) {
+            System.out.println("Error getting network interfaces: " + e.getMessage());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    } //Urban added
+
+    /**
+     * Removes the socket from the list of connections. This is used
+     * in the ClientThread run method which will remove connections if they
+     * were closed by the client or if the connection is lost.
+     * @param closedSocket
+     * @return This method returns a boolean signifying if the connection was removed or not
+     * @see SocketThread This is where this method is used
+     */
+    public static boolean removeConnection(Socket closedSocket) {
+        int index = 0;
+        for (Socket socket : connections) {
+            if(socket == closedSocket) {
+                connections.set(index, null);
+                return false;
+            }
+            index++;
+        }
+        return true;
+    }
+
+    /**
+     * Closes all connections in the list of connections and null values
+     * are ignored.
+     */
+    public static void closeAllConnections() {
+        for(Socket socket : connections) {
+            if(socket == null) continue;
+
+            try {
+                socket.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    /**
+     * Terminates the connection with the specified id. The id of the connection
+     * can be found with the list command. This also sets the value
+     * to null in the list of connections.
+     * @param id The id of the connection
+     */
+    public static void terminateConnection(int id) {
+        Socket socket = connections.get(id-1);
+        if(socket == null) {
+            System.out.println("This connection was already terminated");
+            return;
+        }
+
+        try {
+            String socketAddress = socket.getRemoteSocketAddress().toString();
+            socket.close();
+            System.out.println("Successfully closed connection with " + socketAddress);
+            connections.set(id-1, null);
+        } catch (Exception ex) {
+            System.out.println("I/0 Error: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Prints out all user connections in the following format
+     * id.  ip:port
+     * ex:
+     * 1.   192.168.1.1:5656
+     */
+    public static void listConnections() {
+        System.out.println("#\tip:port");
+        int socketId = 1;
+        for(Socket socket : connections) {
+            if(socket == null) socketId++;
+            else
+                System.out.println(socketId++ + ".\t"+socket.getRemoteSocketAddress().toString());
         }
     }
 
@@ -165,7 +269,7 @@ class SocketThread extends Thread {
     /**
      * Creates a buffered reader from the sockets input stream
      * which will be used to listen for messages that arrive from this connection.
-     * if the message is null then the connection has been closed. This method will
+     * If the message is null, then the connection has been closed. This method will
      * also print the message when it is received.
      */
     public void run() {
@@ -184,8 +288,10 @@ class SocketThread extends Thread {
 
             Chat.printFromThread("The connection with "+ socket.getRemoteSocketAddress().toString() + " was terminated.");
             socket.close();
+            Chat.removeConnection(socket);
         } catch(SocketException ex) {
             Chat.printFromThread("Lost connection with " + socket.getRemoteSocketAddress());
+            Chat.removeConnection(socket);
         } catch (IOException ex) {
             Chat.printFromThread("Server exception: " + ex.getMessage());
         }
