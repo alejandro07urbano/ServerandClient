@@ -319,6 +319,13 @@ class SocketThread extends Thread {
                 if(text == null) {
                     break;
                 }
+                //Display sender's IP and port, along with the message 
+                //Alejandro Urbano added 
+                String senderIp = socket.getInetAddress().getHostAddress();
+                int senderPort = socket.getPort();
+                Chat.printFromThread("Message received from " + senderIp);
+                Chat.printFromThread("Sender's Port: " + senderPort);
+                 Chat.printFromThread("Message: \"" + text + "\"");
                 Chat.printFromThread(socket.getRemoteSocketAddress() + " sent a message\nMessage: "+ text);
             } while(true);
 
