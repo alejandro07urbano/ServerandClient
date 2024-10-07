@@ -55,6 +55,19 @@ public class Chat {
                     break;
                 case "send":
                     // Call send function here
+                    //Alejandro Urbano added 
+                    if(userInputs.length < 3){
+                        System.out.println("Wrong usage\\nEX: send <connection id> <message>");
+                    }
+                    else{
+                        try{
+                            int connectionId = Integer.parseInt(userInputs[1]);
+                            String message = userInput.substring(userInput.indexOf(userInputs[2]));
+                            sendMessage(connectionId, message);
+                        }catch(NumberFormatException e){
+                            System.out.println("Connection ID must be a valid number");
+                        }
+                    }          
                     break;
                 case "list":
                     listConnections();
@@ -65,6 +78,29 @@ public class Chat {
                 default:
                     System.out.println('"'+userInputs[0]+'"' + " is not a command. Type help for a list of commands.");
             }
+        }
+    }
+    // Alejandro Urbano
+    public static void sendMessage(int connectionId, String message) {
+        if(message.length() > 100){
+            System.out.println("Message is too long.");
+            return;
+        }
+
+         if (connectionId <= 0 || connectionId > connections.size() || connections.get(connectionId - 1) == null) {
+             System.out.println("Invalid connection ID")
+                 return;
+         }
+        Socket socket = connections.get(connectionId -1);
+        try{
+            //Send the Message
+             OutputStream output = socket.getOutputStream();
+             PrintWriter writer = new PrintWriter(output, true);
+            writer.println(message);
+
+            System.out.println("Message sent to " + connectionId);
+        }catch(IOException e){
+             System.out.println("Error sending message: " + e.getMessage());
         }
     }
 
