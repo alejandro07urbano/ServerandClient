@@ -41,7 +41,7 @@ public class Chat {
                     System.out.println("Port: " + Server.getMyPort());
                     break;
                 case "connect":
-                    if(userInputs.length == 3) {
+                    if(userInputs.length == 3 && isNumeric(userInputs[2])) {
                         connect(userInputs[1], Integer.parseInt(userInputs[2]));
                     }
                     else {
@@ -49,7 +49,9 @@ public class Chat {
                     }
                     break;
                 case "terminate":
-                    terminateConnection(Integer.parseInt(userInputs[1]));
+                    if(isNumeric(userInputs[1]))
+                        terminateConnection(Integer.parseInt(userInputs[1]));
+                    else System.out.println("Wrong usage\nEX: terminate 1");
                     break;
                 case "send":
                     // Call send function here
@@ -64,6 +66,13 @@ public class Chat {
                     System.out.println('"'+userInputs[0]+'"' + " is not a command. Type help for a list of commands.");
             }
         }
+    }
+
+    public static boolean isNumeric(String s) {
+        for(char c : s.toCharArray()) {
+            if(c < '0' || c > '9') return false;
+        }
+        return true;
     }
 
     private static void displayHelp() {
@@ -138,6 +147,10 @@ public class Chat {
      * @param id The id of the connection
      */
     public static void terminateConnection(int id) {
+        if(id <= 0 || id > connections.size()) {
+            System.out.println("No connection with id of "+id);
+            return;
+        }
         Socket socket = connections.get(id-1);
         if(socket == null) {
             System.out.println("This connection was already terminated");
