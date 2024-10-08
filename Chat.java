@@ -395,8 +395,7 @@ class SocketThread extends Thread {
                 int senderPort = socket.getPort();
                 Chat.printFromThread("Message received from " + senderIp);
                 Chat.printFromThread("Sender's Port: " + senderPort);
-                 Chat.printFromThread("Message: \"" + text + "\"");
-                Chat.printFromThread(socket.getRemoteSocketAddress() + " sent a message\nMessage: "+ text);
+                Chat.printFromThread("Message: \"" + text + "\"");
             } while(true);
 
             Chat.printFromThread("The connection with "+ socket.getRemoteSocketAddress().toString() + " was terminated.");
