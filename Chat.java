@@ -1,17 +1,17 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.awt.font.NumericShaper;
+import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.Scanner;
 public class Chat {
+
     public static boolean waitingForInput;
     public static ArrayList<Socket> connections = new ArrayList<>();
 
     /**
      * Checks for a port number in the args parameter which is defined when running the program.
-     * This method also starts the server thread to listen for incomming connections.
+     * This method also starts the server thread to listen for incoming connections.
      * This method also listens for user input from the user.
      * @param args contains the port number that will be used by the server
      */
@@ -20,7 +20,14 @@ public class Chat {
             System.out.println("Start program with the port argument\nEx: java Chat 6565\n");
             System.exit(1);
         }
-        int port = Integer.parseInt(args[0]);
+        int port = 0;
+        try {
+            port = Integer.parseInt(args[0]);
+        } catch(NumberFormatException e) {
+            System.out.println("Port must be a valid number.");
+            System.exit(1);
+        }
+
         Scanner input = new Scanner(System.in);
         new Server(port).start();
 
@@ -30,31 +37,41 @@ public class Chat {
             String userInput = input.nextLine();
             waitingForInput = false;
             String[] userInputs = userInput.split(" ");
-            switch(userInputs[0]) {
+            String command = userInputs[0].toLowerCase();
+            switch(command) {
                 case "help":
                     displayHelp();
                     break;
                 case "myip":
-                    displayIPAddress();
+                    System.out.println(getIPAddress());
                     break;
                 case "myport":
                     System.out.println("Port: " + Server.getMyPort());
                     break;
                 case "connect":
-                    if(userInputs.length == 3 && isNumeric(userInputs[2])) {
-                        connect(userInputs[1], Integer.parseInt(userInputs[2]));
+                    if(userInputs.length == 3) {
+                        try {
+                            connect(userInputs[1], Integer.parseInt(userInputs[2]));
+                        } catch(NumberFormatException e) {
+                            System.out.println("Port must be a valid number.");
+                        }
                     }
                     else {
                         System.out.println("Wrong usage\nEX: connect 192.168.1.1 6565");
                     }
                     break;
                 case "terminate":
-                    if(isNumeric(userInputs[1]))
-                        terminateConnection(Integer.parseInt(userInputs[1]));
-                    else System.out.println("Wrong usage\nEX: terminate 1");
+                    if(userInputs.length != 2) {
+                        System.out.println("Wrong usage\nEX:terminate 1");
+                        break;
+                    }
+                     try {
+                         terminateConnection(Integer.parseInt(userInputs[1]));
+                     } catch(NumberFormatException e) {
+                         System.out.println("Connection ID must be a valid number");
+                     }
                     break;
                 case "send":
-                    // Call send function here
                     //Alejandro Urbano added 
                     if(userInputs.length < 3){
                         System.out.println("Wrong usage\\nEX: send <connection id> <message>");
@@ -80,7 +97,15 @@ public class Chat {
             }
         }
     }
+
     // Alejandro Urbano
+    /**
+     * Sends a message to the connection id which is equal to the index
+     * of the socket + 1. This method also has input validation making sure
+     * the connection id is valid.
+     * @param connectionId the connection id that will receive the message.
+     * @param message the message to be sent
+     */
     public static void sendMessage(int connectionId, String message) {
         if(message.length() > 100){
             System.out.println("Message is too long.");
@@ -88,14 +113,14 @@ public class Chat {
         }
 
          if (connectionId <= 0 || connectionId > connections.size() || connections.get(connectionId - 1) == null) {
-             System.out.println("Invalid connection ID")
+             System.out.println("Invalid connection ID");
                  return;
          }
         Socket socket = connections.get(connectionId -1);
         try{
             //Send the Message
-             OutputStream output = socket.getOutputStream();
-             PrintWriter writer = new PrintWriter(output, true);
+            OutputStream output = socket.getOutputStream();
+            PrintWriter writer = new PrintWriter(output, true);
             writer.println(message);
 
             System.out.println("Message sent to " + connectionId);
@@ -104,13 +129,9 @@ public class Chat {
         }
     }
 
-    public static boolean isNumeric(String s) {
-        for(char c : s.toCharArray()) {
-            if(c < '0' || c > '9') return false;
-        }
-        return true;
-    }
-
+    /**
+     * Displays the help menu which has a list of all the available commands.
+     */
     private static void displayHelp() {
         System.out.println("Available Commands:");
         System.out.println("help  - Display this help menu.");
@@ -124,21 +145,30 @@ public class Chat {
     }
 
     /**
-     * Displays the ip address of the computer running this process. It does this
+     * Returns the ip address of the computer running this process. It does this
      * by connecting to google.com and getting the local address.
      */
-    private static void displayIPAddress() {
+    private static String getIPAddress() {
         try {
-            Socket socket = new Socket();
-            socket.connect(new InetSocketAddress("google.com", 80));
-            System.out.println(socket.getLocalAddress().toString().substring(1));
-            socket.close();
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+
+            while (networkInterfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = networkInterfaces.nextElement();
+                Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+
+                while (inetAddresses.hasMoreElements()) {
+                    InetAddress inetAddress = inetAddresses.nextElement();
+                    // Check if it's an IPv4 address and not a loopback address
+                    if (inetAddress instanceof java.net.Inet4Address && !inetAddress.isLoopbackAddress()) {
+                        return inetAddress.getHostAddress();
+                    }
+                }
+            }
         } catch (SocketException e) {
-            System.out.println("Error getting network interfaces: " + e.getMessage());
-        } catch (IOException e) {
             e.printStackTrace();
         }
-    } //Urban added
+        return "No ipv4 addresses found";
+    }//Urban added
 
     /**
      * Removes the socket from the list of connections. This is used
@@ -227,6 +257,14 @@ public class Chat {
      * @see SocketThread Has the code that listens for a message from this connection.
      */
     public static void connect(String hostname, int port) {
+        if(getIPAddress().equals(hostname)) {
+            System.out.println("You cannot connect to yourself.");
+            return;
+        }
+        if(isAlreadyConnected(hostname)) {
+            System.out.println("You are already connected to " +hostname);
+            return;
+        }
         Socket socket = null;
         try{
             socket = new Socket(hostname, port);
@@ -238,6 +276,25 @@ public class Chat {
         } catch (IOException ex) {
             System.out.println("I/0 Error: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Checks if the hostname is already in the list of connections.
+     * This iterates over all connections and checks if domain names and ip
+     * address are equal to the specified hostname
+     * @param hostname The hostname that is compared to all connections
+     * @return returns true if the hostname is found
+     */
+    private static boolean isAlreadyConnected(String hostname) {
+        for(Socket socket : connections) {
+            if(socket == null) continue;
+            String address = socket.getRemoteSocketAddress().toString().split(":")[0];
+            String[] hostname_ip = address.split("/");
+            for (String name : hostname_ip) {
+                if(name.equals(hostname)) return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -343,6 +400,13 @@ class SocketThread extends Thread {
             Chat.removeConnection(socket);
         } catch (IOException ex) {
             Chat.printFromThread("Server exception: " + ex.getMessage());
+        } finally {
+            try{
+                socket.close();
+            } catch(IOException e) {
+                System.out.println("Failed to close socket.");
+                e.printStackTrace();
+            }
         }
     }
 }
