@@ -1,4 +1,4 @@
-import java.awt.font.NumericShaper;
+
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
@@ -12,7 +12,7 @@ public class Chat {
     /**
      * Checks for a port number in the args parameter which is defined when running the program.
      * This method also starts the server thread to listen for incoming connections.
-     * This method also listens for user input from the user.
+     * This method also listens for user input.
      * @param args contains the port number that will be used by the server
      */
     public static void main(String[] args) {
@@ -100,10 +100,9 @@ public class Chat {
 
     // Alejandro Urbano
     /**
-     * Sends a message to the connection id which is equal to the index
-     * of the socket + 1. This method also has input validation making sure
-     * the connection id is valid.
-     * @param connectionId the connection id that will receive the message.
+     * Sends a message to the socket that is in the list of connections at index connectionId - 1.
+     * This method also has input validation making sure the connection id is valid.
+     * @param connectionId the connection id of the socket that will receive the message.
      * @param message the message to be sent
      */
     public static void sendMessage(int connectionId, String message) {
@@ -145,8 +144,42 @@ public class Chat {
     }
 
     /**
+     * Checks if the address is a self address meaning the address
+     * belongs to the computer running the program. It does this by getting
+     * the network interfaces and getting the inetAddresses for each interface.
+     * For each inetaddres, we get the host address and compare it to the address
+     * that was passed to this function. If they are equal, it will return true.
+     * If address does not match any addresses on the computer, it will return false
+     * @param address the address that will be compared
+     * @return a boolean that signifies if address is a self address.
+     */
+    static boolean isSelfAddress(String address) {
+        if(address.equals("localhost")) return true;
+        try {
+           Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+
+           while (networkInterfaces.hasMoreElements()) {
+               NetworkInterface networkInterface = networkInterfaces.nextElement();
+               Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+
+               while (inetAddresses.hasMoreElements()) {
+                   InetAddress inetAddress = inetAddresses.nextElement();
+                   if(address.equals(inetAddress.getHostAddress())) return true;
+               }
+           }
+       }
+       catch (SocketException e) {
+           e.printStackTrace();
+       }
+        return false;
+    }
+
+    /**
      * Returns the ip address of the computer running this process. It does this
-     * by connecting to google.com and getting the local address.
+     * by getting the network interfaces and looking each element and getting the
+     * inetAddresses. It loops through the inetAddresses and finds an ipv4 address
+     * that is not a loopback address. Once found, it will return the address. If none are found,
+     * it will return a string that states no ipv4 address found.
      */
     private static String getIPAddress() {
         try {
@@ -173,8 +206,10 @@ public class Chat {
     /**
      * Removes the socket from the list of connections. This is used
      * in the ClientThread run method which will remove connections if they
-     * were closed by the client or if the connection is lost.
-     * @param closedSocket
+     * were closed by the client or if the connection is lost. It does this by looping
+     * through the list of connections until it finds the socket that was closed and
+     * sets the value at that index to null.
+     * @param closedSocket the socket that was closed
      * @return This method returns a boolean signifying if the connection was removed or not
      * @see SocketThread This is where this method is used
      */
@@ -192,7 +227,8 @@ public class Chat {
 
     /**
      * Closes all connections in the list of connections and null values
-     * are ignored.
+     * are ignored. It does this by looping through the list of connections and
+     * closing all sockets.
      */
     public static void closeAllConnections() {
         for(Socket socket : connections) {
@@ -209,7 +245,8 @@ public class Chat {
     /**
      * Terminates the connection with the specified id. The id of the connection
      * can be found with the list command. This also sets the value
-     * to null in the list of connections.
+     * to null in the list of connections. This method also has input validation
+     * making sure that the connection id is valid.
      * @param id The id of the connection
      */
     public static void terminateConnection(int id) {
@@ -235,12 +272,12 @@ public class Chat {
 
     /**
      * Prints out all user connections in the following format
-     * id.  ip:port
+     * id.  domainName/ip:port
      * ex:
-     * 1.   192.168.1.1:5656
+     * 1.   domainName/192.168.1.1:5656
      */
     public static void listConnections() {
-        System.out.println("#\tip:port");
+        System.out.println("id.\tdomainName/ip:port");
         int socketId = 1;
         for(Socket socket : connections) {
             if(socket == null) socketId++;
@@ -251,13 +288,17 @@ public class Chat {
 
     /**
      * Attempts to establish a tcp connection with the hostname and port.
-     * It also starts a clientThread which will listen for messages from this connection.
+     * Has input validation by checking if the hostname is not a self address or
+     * if a connection with this host exists. If it is not a self address or a duplicate
+     * address, it will attempt to connect address and port. If successful, it will add
+     * the new socket to the list of connections and start a new SocketThread to
+     * listen for messages. If not successful, the appropriate message is printed out.
      * @param hostname hostname of the computer you are trying to connect to
      * @param port port of the process you are trying to connect to
      * @see SocketThread Has the code that listens for a message from this connection.
      */
     public static void connect(String hostname, int port) {
-        if(getIPAddress().equals(hostname)) {
+        if(isSelfAddress(hostname)) {
             System.out.println("You cannot connect to yourself.");
             return;
         }
